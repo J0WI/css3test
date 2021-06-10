@@ -1,13 +1,15 @@
-var Score = function(parent) {
-	this.passed = this.total =
-	this.passedTests = this.totalTests = 0;
-
+var Score = function (parent) {
+	this.passed = this.total = this.passedTests = this.totalTests = 0;
 	this.parent = parent || null;
 };
 
+var ele = function (name) {
+	return document.getElementById(name);
+}
+
 Score.prototype = {
-	update: function(data) {
-		if(!data.total) { return; }
+	update: function (data) {
+		if (!data.total) { return; }
 
 		this.passedTests += data.passed;
 		this.totalTests += data.total;
@@ -15,50 +17,114 @@ Score.prototype = {
 		this.total++;
 		this.passed += data.passed / data.total;
 
-		if(this.parent) {
+		if (this.parent) {
 			this.parent.update(data);
 		}
 	},
 
-	toString: function() {
+	toString: function () {
 		return this.percent() + '%';
 	},
 
-	percent: function() {
+	percent: function () {
 		return Math.round(100 * this.passed / this.total);
 	}
 };
 
-var mainScore = new Score(), _bTestResults = {};
+var mainScore = new Score(),
+	_bTestResults = {};
 
-var Test = function (tests, spec, title) {
-	this.tests = tests;
-	this.id = spec;
-	this.title = title;
+var devLinkFormat = function (params) {
+	switch (params.devtype) {
+		case "fxtf":
+			// FX Task Force Editor Drafts
+			return 'https://drafts.fxtf.org/' + params.dev;
+		case "houdini":
+			// CSS-TAG Houdini Editor Drafts
+			return 'https://drafts.css-houdini.org/' + params.dev;
+		case "github":
+			return 'https://w3c.github.io/' + params.dev;
+		case "svgwg":
+			// SVG Working Group Editor Drafts
+			return 'https://svgwg.org/' + params.dev;
+		case "whatwg":
+			// WHATWG
+			return 'https://' + params.dev + '.spec.whatwg.org/';
+		case "math":
+			// The MathML Refresh Community Group
+			return 'https://mathml-refresh.github.io/' + params.dev;
+		default:
+			// CSS Working Group Editor Drafts
+			return 'https://drafts.csswg.org/' + params.dev;
+	}
+};
+
+
+var devLinkLogo = function (params) {
+	switch (params.devtype) {
+		case "whatwg":
+			return params.devtype;
+		case "svgwg":
+		case "houdini":
+		case "fxtf":
+		case "github":
+		case "math":
+		default:
+			return 'w3c';
+	}
+};
+
+var Test = function (spec) {
+	this.tests = spec.tests;
+	this.id = spec.id;
+	this.title = spec.title;
 
 	this.score = new Score(mainScore);
 
-	var
-	h1 = $.create({
+	var contents = [this.title];
+
+	if (spec.tests.links) {
+		if (spec.tests.links.tr) {
+			contents.push($.create({
+				tag: 'a',
+				properties: {
+					href: 'https://www.w3.org/TR/' + spec.tests.links.tr,
+					target: '_blank',
+					textContent: 'TR',
+					className: 'spec-link w3c-link'
+				}
+			}));
+		}
+
+		if (spec.tests.links.dev) {
+			contents.push($.create({
+				tag: 'a',
+				properties: {
+					href: devLinkFormat(spec.tests.links),
+					target: '_blank',
+					textContent: 'DEV',
+					className: 'spec-link ' + devLinkLogo(spec.tests.links) + '-link'
+				}
+			}));
+		}
+
+		if (spec.tests.links.mdn) {
+			contents.push($.create({
+				tag: 'a',
+				properties: {
+					href: 'https://developer.mozilla.org/en-US/docs/' + spec.tests.links.mdn,
+					target: '_blank',
+					textContent: 'MDN',
+					className: 'spec-link mdn-link'
+				}
+			}));
+		}
+	}
+
+	var h1 = $.create({
 		tag: 'h1',
-		contents: [
-			this.title,
-			$.create({
-				tag: 'a',
-				href: 'http://w3.org/TR/' + this.id,
-				target: '_blank',
-				textContent: 'TR',
-				className: 'spec-link'
-			}),
-			$.create({
-				tag: 'a',
-				href: 'https://drafts.csswg.org/' + this.id,
-				target: '_blank',
-				textContent: 'DEV',
-				className: 'spec-link'
-			})
-		]
-	}), valuesSection;
+		contents: contents
+	});
 
 	// Wrapper section
 	this.section = $.create({
@@ -69,7 +135,7 @@ var Test = function (tests, spec, title) {
 	});
 
 	// Perform tests
-	for(var id in Test.groups) {
+	for (var id in Test.groups) {
 		this.group(id, Test.groups[id]);
 	}
 
@@ -84,7 +150,7 @@ var Test = function (tests, spec, title) {
 		inside: h1
 	});
 
-	all.appendChild(this.section);
+	ele('all').appendChild(this.section);
 
 	// Add to list of tested specs
 	$.create({
@@ -94,20 +160,20 @@ var Test = function (tests, spec, title) {
 		contents: [
 			{
 				tag: 'a',
-				href: '#' + spec,
-				contents: title
+				href: '#' + spec.id,
+				contents: this.title
 			}
 		],
-		inside: specsTested
+		inside: ele('specsTested')
 	});
 }
 
 Test.prototype = {
-	group: function(what, testCallback) {
+	group: function (what, testCallback) {
 		var thisSection, theseTests = this.tests[what];
 
-		for(var feature in theseTests) {
-			if(feature === 'properties') {
+		for (var feature in theseTests) {
+			if (feature === 'properties') {
 				continue;
 			}
 
@@ -115,49 +181,130 @@ Test.prototype = {
 				tag: 'section',
 				className: 'tests ' + what,
 				contents: {
-						tag: 'h1',
-						contents: what
-					},
+					tag: 'h1',
+					contents: what
+				},
 				inside: this.section
 			});
 
-			var dl = document.createElement('dl'),
-			    dt = $.create({
-					tag: 'dt',
-					textContent: feature,
-					tabIndex: '0',
-					inside: dl
-			});
+			var summaryContents = [
+				document.createTextNode(feature),
+				null // for prefix
+			];
 
-			var passed = 0, tests = theseTests[feature];
+			var links = theseTests[feature].links;
+			if (links) {
+				if (links.tr) {
+					summaryContents.push($.create({
+						tag: 'a',
+						properties: {
+							href: 'https://www.w3.org/TR/' + this.tests.links.tr + links.tr,
+							target: '_blank',
+							textContent: 'TR',
+							className: 'spec-link w3c-link'
+						}
+					}));
+				}
 
-			tests = tests instanceof Array? tests : [tests];
+				if (links.dev) {
+					summaryContents.push($.create({
+						tag: 'a',
+						properties: {
+							href: devLinkFormat(this.tests.links).replace(/#.*/, '') + links.dev,
+							target: '_blank',
+							textContent: 'DEV',
+							className: 'spec-link ' + devLinkLogo(this.tests.links) + '-link'
+						}
+					}));
+				}
 
-			for(var i=0, test; test = tests[i++];) {
+				var mdnLink = 'https://developer.mozilla.org/en-US/docs/Web/';
+				switch (links.mdnGroup) {
+					case 'SVG':
+						mdnLink += 'SVG/Attribute/';
+						break;
+					default:
+						mdnLink += 'CSS/';
+						// add exception for Media Queries if no link define
+						if (what === "Media queries" && !links.mdn) {
+							mdnLink += '@media/';
+						}
+						break;
+				}
+				mdnLink += links.mdn
+					? links.mdn
+					: feature.startsWith(':')
+					? feature.replace('()', '')
+					: feature;
+
+				summaryContents.push($.create({
+					tag: 'a',
+					properties: {
+						href: mdnLink,
+						target: '_blank',
+						textContent: 'MDN',
+						className: 'spec-link mdn-link'
+					}
+				}));
+			}
+
+			var passed = 0,
+				tests = theseTests[feature].tests || theseTests[feature],
+				propertyPrefix = null,
+				testsResults = [];
+
+			tests = tests instanceof Array ? tests : [tests];
+
+			for (var i = 0, test; test = tests[i++];) {
 				var results = testCallback(test, feature, theseTests),
-				    success, note;
+					success, prefix, propertyPrefix, note;
 
-				if(typeof results === 'object') {
+				if (typeof results === 'object') {
 					success = results.success;
+					propertyPrefix = propertyPrefix || results.propertyPrefix;
+					prefix = results.prefix;
 					note = results.note;
 				}
-				else { success = +!!results }
 
 				passed += +success;
 
-				$.create({
-					tag: 'dd',
-					innerHTML: test + (note? '<small>' + note + '</small>' : ''),
-					className: passclass({passed: Math.round(success * 10000), total: 10000 }),
-					inside: dl
+				testsResults.push($.create({
+					tag: 'li',
+					innerHTML: test
+						+ (prefix ? '<span class="prefix">' + prefix + '</span>' : '')
+						+ (note ? '<small>' + note + '</small>' : ''),
+					className: passclass({ passed: Math.round(success * 10000), total: 10000 }),
+				}));
+			}
+
+			if (propertyPrefix) {
+				summaryContents[1] = $.create({
+					tag: 'span',
+					className: 'prefix',
+					textContent: propertyPrefix
 				});
 			}
 
-			this.score.update({passed: passed, total: tests.length });
+			var detailsContents = [
+				$.create({
+					tag: 'summary',
+					className: passclass({ passed: passed, total: tests.length }),
+					contents: summaryContents,
+				}),
+				$.create({
+					tag: 'ul',
+					contents: testsResults,
+				})
+			];
 
-			dt.className = passclass({ passed: passed, total: tests.length });
+			var details = $.create({
+				tag: 'details',
+				contents: detailsContents
+			});
 
-			thisSection.appendChild(dl);
+			thisSection.appendChild(details);
+
+			this.score.update({ passed: passed, total: tests.length });
 
 			// Add to browserscope
 			_bTestResults[this.id + ' / ' + feature.replace(/[,=]/g, '')] = Math.round(100 * passed / tests.length);
@@ -166,17 +313,17 @@ Test.prototype = {
 }
 
 Test.groups = {
-	'values': function(test, label, tests) {
+	'values': function (test, label, tests) {
 		var properties = tests.properties,
 			failed = [];
 
-		for(var j=0, property; property = properties[j++];) {
-			if(!Supports.property(property)) {
+		for (var j = 0, property; property = properties[j++];) {
+			if (!Supports.property(property).success) {
 				properties.splice(--j, 1);
 				continue;
 			}
 
-			if(!Supports.value(property, test)) {
+			if (!Supports.value(property, test).success) {
 				failed.push(property);
 			}
 		}
@@ -185,45 +332,54 @@ Test.groups = {
 
 		return {
 			success: success,
-			note: success > 0 && success < 1? 'Failed in: ' + failed.join(', ') : ''
+			note: success > 0 && success < 1 ? 'Failed in: ' + failed.join(', ') : ''
 		}
 	},
 
-	'properties': function(value, property) {
+	'properties': function (value, property) {
 		return Supports.value(property, value);
 	},
 
-	'descriptors': function(value, descriptor) {
+	'descriptors': function (value, descriptor) {
 		return Supports.descriptorvalue(descriptor, value);
 	},
 
-	'selectors': function(test) {
+	'selectors': function (test) {
 		return Supports.selector(test);
 	},
 
-	'@rules': function(test) {
+	'declaration': function (test) {
+		return Supports.declaration(test);
+	},
+
+	'@rules': function (test) {
 		return Supports.atrule(test);
 	},
 
-	'Media queries': function(test) {
+	'Media queries': function (test) {
 		var matches = matchMedia(test);
-
-		return matches.media !== 'invalid' && matches.matches;
+		if (matches.media !== 'invalid' && matches.matches) {
+			return { success: true };
+		}
+		else {
+			var matches = matchMedia('not ' + test);
+			return { success: matches.media !== 'invalid' && matches.matches }
+		}
 	}
 };
 
 function passclass(info) {
 	var success;
 
-	if('passed' in info) {
+	if ('passed' in info) {
 		success = info.passed / info.total;
 	}
-	else if('failed' in info) {
+	else if ('failed' in info) {
 		success = 1 - info.failed / info.total;
 	}
 
 	var classes = [
-	  'epic-fail',
+		'epic-fail',
 		'fail',
 		'very-buggy',
 		'buggy',
@@ -237,27 +393,15 @@ function passclass(info) {
 	return classes[index];
 }
 
-document.onclick = function(evt) {
-	var target = evt.target;
-
-	if(/^dt$/i.test(target.nodeName)) {
-		evt.stopPropagation();
-
-		var dl = target.parentNode;
-
-		dl.className = dl.className === 'open'? '' : 'open';
-	}
-}
-
-Array.prototype.and = function(arr2, separator) {
+Array.prototype.and = function (arr2, separator) {
 	separator = separator || ' ';
 
 	var ret = [],
-		map = function(val) {
+		map = function (val) {
 			return val + separator + arr2[j]
 		};
 
-	for(var j=0; j<arr2.length; j++) {
+	for (var j = 0; j < arr2.length; j++) {
 		ret = ret.concat(this.map(map));
 	}
 
@@ -265,7 +409,7 @@ Array.prototype.and = function(arr2, separator) {
 };
 
 // [ x or y or z ]{min, max}
-Array.prototype.times = function(min, max, separator) {
+Array.prototype.times = function (min, max, separator) {
 	separator = separator || ' ';
 
 	max = max || min;
@@ -273,20 +417,20 @@ Array.prototype.times = function(min, max, separator) {
 	var ret = [];
 
 
-	if(min === max) {
-		if(min === 1) {
+	if (min === max) {
+		if (min === 1) {
 			ret = this.slice(); // clone
 		}
 		else {
 			ret = this.and(this, separator);
 
-			for(var i=2; i<min; i++) {
+			for (var i = 2; i < min; i++) {
 				ret = this.and(ret, separator);
 			}
 		}
 	}
-	else if(min < max) {
-		for(var i=min; i<=max; i++) {
+	else if (min < max) {
+		for (var i = min; i <= max; i++) {
 			ret = ret.concat(this.times(i, i, separator));
 		}
 	}
@@ -294,33 +438,45 @@ Array.prototype.times = function(min, max, separator) {
 	return ret;
 };
 
-onload = function() {
+onload = function () {
 	var timeBefore = +new Date,
-		duration = 0;
+		duration = 0,
+		specs = [];
 
-	var specs = [];
+	var removedWords = / *(?:\([^)]*\)|:.*|\b(?:CSS|Module)\b)( *)/g;
 
-	for(var spec in Specs) {
-		specs.push(spec);
+	for (var spec in Specs) {
+		specs.push({
+			id: spec,
+			// Shorten the title by removing parentheticals,
+			// subheadings, CSS and Module words
+			title: Specs[spec].title.replace(removedWords, "$1").trim(),
+			tests: Specs[spec]
+		});
 	}
 
-	(function() {
-		if(specs.length) {
+	specs.sort(function (a, b) {
+		return a.title.localeCompare(b.title);
+	});
+
+
+	(function () {
+		if (specs.length) {
 			// Get spec id
 			var spec = specs.shift();
 
 			// Run tests
-			var test = new Test(Specs[spec], spec, Specs[spec].title);
+			var test = new Test(spec);
 
 			// Count test duration
 			duration += +new Date - timeBefore;
 			timeBefore = +new Date;
 
 			// Output current score
-			score.textContent = mainScore + '';
-			passedTests.textContent = ~~mainScore.passedTests;
-			totalTests.textContent = mainScore.totalTests;
-			total.textContent = mainScore.total;
+			ele('score').textContent = mainScore + '';
+			ele('passedTests').textContent = ~~mainScore.passedTests;
+			ele('totalTests').textContent = mainScore.totalTests;
+			ele('total').textContent = mainScore.total;
 
 			// Schedule next test
 			setTimeout(arguments.callee, 50)
@@ -329,7 +485,7 @@ onload = function() {
 			// Done!
 
 			// Display time taken
-			timeTaken.textContent = +new Date - timeBefore + 'ms';
+			ele('timeTaken').textContent = +new Date - timeBefore + 'ms';
 
 			// Send to Browserscope
 			var testKey = 'agt1YS1wcm9maWxlcnINCxIEVGVzdBidzawNDA';
